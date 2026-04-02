@@ -1,6 +1,7 @@
 auth/*
 !auth/.gitkeep
-workspace/
+workspace/*
+!workspace/.gitkeep
 node_modules/
 .env
 *.env

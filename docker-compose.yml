@@ -5,7 +5,7 @@
 #   docker compose run --rm claude          # bash shell
 #   docker compose run --rm claude claude   # start Claude CLI directly
 #
-#   # Mount a specific project:
+#   # Mount a specific project instead of ./workspace:
 #   PROJECT_PATH=/path/to/project docker compose run --rm claude
 
 services:
@@ -17,4 +17,4 @@ services:
     tty: true
     volumes:
       - ./auth:/home/claude/.claude
-      - ${PROJECT_PATH:-.}:/workspace
+      - ${PROJECT_PATH:-./workspace}:/workspace

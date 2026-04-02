@@ -1,5 +1,5 @@
 # Pin base image digest for reproducible builds (Ubuntu 24.04 Noble Numbat)
-FROM ubuntu:24.04@sha256:6015f66923d7afbc53558d7ccffd325d8b4c8e3f13fe2aebffa2e83effa1b940
+FROM ubuntu:24.04@sha256:186072bba1b2f436cbb91ef2567abca677337cfc786c86e107d25b7072feef0c
 
 ENV DEBIAN_FRONTEND=noninteractive
 
