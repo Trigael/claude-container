@@ -1,4 +1,5 @@
-FROM ubuntu:24.04
+# Pin base image digest for reproducible builds (Ubuntu 24.04 Noble Numbat)
+FROM ubuntu:24.04@sha256:6015f66923d7afbc53558d7ccffd325d8b4c8e3f13fe2aebffa2e83effa1b940
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -31,7 +32,9 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# --- Layer 3: Docker CLI + compose plugin (no daemon) ---
+# --- Layer 3: Full Docker engine for Docker-in-Docker ---
+# Installs the daemon (dockerd), CLI, containerd, and compose plugin.
+# The daemon runs inside the container so nested containers are fully isolated.
 RUN install -m 0755 -d /etc/apt/keyrings \
     && curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
        -o /etc/apt/keyrings/docker.asc \
@@ -42,20 +45,26 @@ RUN install -m 0755 -d /etc/apt/keyrings \
        > /etc/apt/sources.list.d/docker.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
+       docker-ce \
        docker-ce-cli \
+       containerd.io \
        docker-compose-plugin \
     && rm -rf /var/lib/apt/lists/*
 
-# --- Layer 4: Non-root user with passwordless sudo ---
+# --- Layer 4: Non-root user with restricted sudo ---
 RUN groupadd -f docker \
     && useradd -m -s /bin/bash -G sudo,docker claude \
-    && echo "claude ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/claude \
+    && echo "claude ALL=(ALL) NOPASSWD: /usr/bin/dockerd, /usr/sbin/groupmod, /bin/chown" > /etc/sudoers.d/claude \
     && chmod 0440 /etc/sudoers.d/claude
 
 # --- Layer 5: Claude CLI (native installer, must run as target user) ---
+# NOTE: Add checksum verification when Anthropic provides an official checksum.
+# For now we download-then-execute to allow inspection.
 USER claude
 WORKDIR /tmp
-RUN curl -fsSL https://claude.ai/install.sh | bash
+RUN curl -fsSL https://claude.ai/install.sh -o /tmp/install-claude.sh \
+    && bash /tmp/install-claude.sh \
+    && rm /tmp/install-claude.sh
 
 # --- Layer 6: Aliases, environment, entrypoint ---
 USER root
@@ -72,6 +81,9 @@ ENV LANG=en_US.UTF-8 \
 
 COPY --chown=claude:claude entrypoint.sh /home/claude/entrypoint.sh
 RUN chmod +x /home/claude/entrypoint.sh
+
+# Docker-in-Docker: persist Docker storage across container restarts
+VOLUME /var/lib/docker
 
 ENTRYPOINT ["/home/claude/entrypoint.sh"]
 CMD ["bash"]

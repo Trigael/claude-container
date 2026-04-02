@@ -1,13 +1,25 @@
 #!/bin/bash
 set -e
 
-# Fix Docker socket permissions if mounted
-if [ -S /var/run/docker.sock ]; then
-    SOCK_GID=$(stat -c '%g' /var/run/docker.sock)
-    CURRENT_DOCKER_GID=$(getent group docker | cut -d: -f3)
-    if [ "$SOCK_GID" != "$CURRENT_DOCKER_GID" ]; then
-        sudo groupmod -g "$SOCK_GID" docker
-    fi
+# Start Docker daemon in the background (Docker-in-Docker)
+if [ "${SKIP_DOCKER:-0}" = "1" ]; then
+    echo "Docker daemon skipped (SKIP_DOCKER=1)."
+else
+    sudo dockerd --host=unix:///var/run/docker.sock --storage-driver=overlay2 > /var/log/dockerd.log 2>&1 &
+
+    # Wait for Docker daemon to be ready
+    echo "Waiting for Docker daemon..."
+    timeout=30
+    until docker info >/dev/null 2>&1; do
+        timeout=$((timeout - 1))
+        if [ "$timeout" -le 0 ]; then
+            echo "Error: Docker daemon failed to start" >&2
+            echo "Check logs: cat /var/log/dockerd.log" >&2
+            exit 1
+        fi
+        sleep 1
+    done
+    echo "Docker daemon ready."
 fi
 
 # Ensure correct ownership of mounted .claude auth directory
